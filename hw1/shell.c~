@@ -69,11 +69,8 @@ int cmd_pwd(struct tokens *tokens){
 
 /*Change the directory to the file name */
 int cmd_cd(struct tokens *tokens){
-    char * dirPath = tokens_get_token(tokens, 1);
-    if (chdir(dirPath) == 0)
-	fprintf(stdout, "dir changed to:%s\n", dirPath);
-    else
-	perror("wrong dir!");
+    char * dirPath = tokens_get_token(tokens, 0);
+    fprintf(stdout, "%s\n", dirPath);
 }
 
 /* Looks up the built-in command, if it exists. */
