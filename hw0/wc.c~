@@ -25,7 +25,7 @@ int countFile(char* file) {
 	switch (c) {
 	    case '\n':line_cnt++;
 	    case ' ':word_cnt++;break;
-	    default:char_cnt++;printf("%c",c);
+	    defalut:char_cnt++;printf("%c",c);
 	}
     }
     fclose(fp);
