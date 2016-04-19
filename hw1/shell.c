@@ -9,6 +9,8 @@
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <dirent.h>
 #include "tokenizer.h"
 
 /* Whether the shell is connected to an actual terminal or not. */
@@ -27,6 +29,7 @@ int cmd_exit(struct tokens *tokens);
 int cmd_help(struct tokens *tokens);
 int cmd_pwd(struct tokens *tokens);
 int cmd_cd(struct tokens *tokens);
+int path_resolve(char ** tokens_argv);
 
 /* Built-in command functions take token array (see parse.h) and return int */
 typedef int cmd_fun_t(struct tokens *tokens);
@@ -109,6 +112,41 @@ void init_shell() {
     tcgetattr(shell_terminal, &shell_tmodes);
   }
 }
+int path_resolve(char ** tokens_argv){
+    char * line = getenv("PATH");
+    int i=0;
+    while( *(line+i) != NULL){
+	if( *(line+i) == ':')
+	    *(line+i) = ' ';
+	i++;
+    }
+    struct tokens *path_tokens = tokenize(line);
+    //test for path get
+    for(int i = 0; i < tokens_get_length(path_tokens); i++)
+	fprintf(stdout, "path: %s\n", tokens_get_token(path_tokens, i));
+    DIR* dir;
+    struct dirent* ent;
+    for(int i = 0; i < tokens_get_length(path_tokens); i++){
+	if ((dir = opendir(tokens_get_token(path_tokens, i))) == NULL)
+	    continue;
+	else{
+	    while ((ent = readdir(dir)) != NULL){
+		if(strcmp(ent->d_name, *tokens_argv) == 0){
+		    strncpy(*tokens_argv, tokens_get_token(path_tokens, i),strlen(tokens_get_token(path_tokens, i)));
+		    strncat(*tokens_argv,"/",1);
+		    strncat(*tokens_argv,ent->d_name,strlen(ent->d_name));
+		    //print success message
+		    //fprintf(stdout,"found!! %s\n", *tokens_argv);
+		    return 1;
+		}
+	    }
+	}
+    }
+    return -1;
+}
+
+
+
 
 int main(int argc, char *argv[]) {
   init_shell();
@@ -144,9 +182,19 @@ int main(int argc, char *argv[]) {
 	      wait(NULL);
 	      fprintf(stdout, "this is main %d\n",pid);
 	  }else{
-	      char * token_argv = tokens_get_token(tokens,0);
-	      if(execv(token_argv[0],token_argv) < 0)
-		  fprintf(stdout, "exec failed\n");
+	      char * tokens_argv[tokens_get_length(tokens)+1];
+	      int i;
+	      for(i = 0; i < tokens_get_length(tokens); i++)
+		  (tokens_argv[i]) = tokens_get_token(tokens,i);
+	      tokens_argv[i] = NULL;
+	      if(path_resolve(tokens_argv) > 0)
+		  //fprintf(stdout, "path solved successfully!\n");
+	      else{
+		  //fprintf(stdout,"failed\n");
+		  //exit(0);
+	      }
+	      if(execv(tokens_argv[0],tokens_argv) < 0)
+	          fprintf(stderr, "%s %d: Command not found\n", tokens_argv[1] ,errno);
 	      else
 		  fprintf(stdout, "exec successed\n");
 	  }
