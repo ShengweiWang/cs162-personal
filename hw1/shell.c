@@ -29,7 +29,11 @@ int cmd_exit(struct tokens *tokens);
 int cmd_help(struct tokens *tokens);
 int cmd_pwd(struct tokens *tokens);
 int cmd_cd(struct tokens *tokens);
+int cmd_wait();
 int path_resolve(char ** tokens_argv);
+int io_redirect(char ** tokens_argv);
+void signal_ignore();
+void signal_activate();
 
 /* Built-in command functions take token array (see parse.h) and return int */
 typedef int cmd_fun_t(struct tokens *tokens);
@@ -45,7 +49,8 @@ fun_desc_t cmd_table[] = {
   {cmd_help, "?", "show this help menu"},
   {cmd_exit, "exit", "exit the command shell"},
   {cmd_pwd, "pwd", "show current working directory"},
-  {cmd_cd, "cd", "change the directory to the given path"}
+  {cmd_cd, "cd", "change the directory to the given path"},
+  {cmd_wait, "wait", "wait for all processes"}
 };
 
 /* Prints a helpful description for the given command */
@@ -79,12 +84,41 @@ int cmd_cd(struct tokens *tokens){
 	perror("wrong dir!");
 }
 
+/* Wait for all process finished */
+int cmd_wait() {
+    int status;
+    pid_t pid;
+    while ((pid = waitpid(-1, &status, 0)) > 0)
+	;
+    if (errno != ECHILD) 
+	fprintf(stderr, "waitpid error\n");
+    return 0;
+}
+
 /* Looks up the built-in command, if it exists. */
 int lookup(char cmd[]) {
   for (int i = 0; i < sizeof(cmd_table) / sizeof(fun_desc_t); i++)
     if (cmd && (strcmp(cmd_table[i].cmd, cmd) == 0))
       return i;
   return -1;
+}
+/* Ignore the signal */
+void signal_ignore() { 
+    signal(SIGINT, SIG_IGN);
+    signal(SIGQUIT, SIG_IGN);
+    signal(SIGTSTP, SIG_IGN);
+    signal(SIGTTIN, SIG_IGN);
+    signal(SIGTTOU, SIG_IGN);
+}
+
+
+/* Replace the current signal hander with the default handler */
+void signal_activate() { 
+    signal(SIGINT, SIG_DFL);
+    signal(SIGQUIT, SIG_DFL);
+    signal(SIGTSTP, SIG_DFL);
+    signal(SIGTTIN, SIG_DFL);
+    signal(SIGTTOU, SIG_DFL);
 }
 
 /* Intialization procedures for this shell */
@@ -101,9 +135,18 @@ void init_shell() {
      * foreground, we'll receive a SIGCONT. */
     while (tcgetpgrp(shell_terminal) != (shell_pgid = getpgrp()))
       kill(-shell_pgid, SIGTTIN);
+    
+    /* Ignore the signals */
+    signal_ignore();
 
     /* Saves the shell's process id */
     shell_pgid = getpid();
+
+    /* Put shell in its own process group */
+    if (setpgid(shell_pgid, shell_pgid) < 0) {
+	fprintf(stderr, "Couldn't put the shell in its own process group\n");
+	exit(1);
+    }
 
     /* Take control of the terminal */
     tcsetpgrp(shell_terminal, shell_pgid);
@@ -145,7 +188,9 @@ int path_resolve(char ** tokens_argv){
     return -1;
 }
 
-
+int io_redirect(char ** tokens_argv){
+    return 0;
+}
 
 
 int main(int argc, char *argv[]) {
@@ -171,6 +216,29 @@ int main(int argc, char *argv[]) {
       /* REPLACE this to run commands as programs. */
       int mainpid = getpid();
       fprintf(stdout, "this pid is %d\n",mainpid);
+      char * tokens_argv[tokens_get_length(tokens)+1];
+      int i;
+      for(i = 0; i < tokens_get_length(tokens); i++)
+	  (tokens_argv[i]) = tokens_get_token(tokens,i);
+      tokens_argv[i] = NULL;
+      /* background setting */
+      int bg = 0;
+      if (strcmp(tokens_argv[tokens_get_length(tokens)-1], "&") == 0){
+	  bg = 1;
+	  free(tokens_argv[tokens_get_length(tokens)-1]);
+	  tokens_argv[tokens_get_length(tokens)-1] = NULL;
+      }
+
+      //io_redirect(tokens_argv);
+      if(path_resolve(tokens_argv) > 0)
+	  ;
+	  //fprintf(stdout, "path solved successfully!\n");
+      else{
+	  ;
+	  //fprintf(stdout,"failed\n");
+	  //exit(1);
+      }
+
       pid_t pid;
       pid = fork();
       if(pid < 0)
@@ -179,24 +247,18 @@ int main(int argc, char *argv[]) {
       }
       else{
 	  if(pid == 0){
-	      wait(NULL);
-	      fprintf(stdout, "this is main %d\n",pid);
-	  }else{
-	      char * tokens_argv[tokens_get_length(tokens)+1];
-	      int i;
-	      for(i = 0; i < tokens_get_length(tokens); i++)
-		  (tokens_argv[i]) = tokens_get_token(tokens,i);
-	      tokens_argv[i] = NULL;
-	      if(path_resolve(tokens_argv) > 0)
-		  //fprintf(stdout, "path solved successfully!\n");
-	      else{
-		  //fprintf(stdout,"failed\n");
-		  //exit(0);
-	      }
+	      signal_activate();
 	      if(execv(tokens_argv[0],tokens_argv) < 0)
 	          fprintf(stderr, "%s %d: Command not found\n", tokens_argv[1] ,errno);
 	      else
 		  fprintf(stdout, "exec successed\n");
+	  }else{
+	      if(!bg){
+		  int child_status;
+		  if (waitpid(pid, &child_status, 0) < 0) 
+		      fprintf(stderr, "waitpid error\n");
+	      }
+	      fprintf(stdout, "this is main %d\n",pid);
 	  }
       }
     }
