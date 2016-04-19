@@ -69,8 +69,11 @@ int cmd_pwd(struct tokens *tokens){
 
 /*Change the directory to the file name */
 int cmd_cd(struct tokens *tokens){
-    char * dirPath = tokens_get_token(tokens, 0);
-    fprintf(stdout, "%s\n", dirPath);
+    char * dirPath = tokens_get_token(tokens, 1);
+    if (chdir(dirPath) == 0)
+	fprintf(stdout, "dir changed to:%s\n", dirPath);
+    else
+	perror("wrong dir!");
 }
 
 /* Looks up the built-in command, if it exists. */
@@ -129,7 +132,28 @@ int main(int argc, char *argv[]) {
     } else {
       /* REPLACE this to run commands as programs. */
       fprintf(stdout, "This shell doesn't know how to run programs.\n");
+      int mainpid = getpid();
+      fprintf(stdout, "this pid is %d\n",mainpid);
+      pid_t pid;
+      pid = fork();
+      if(pid < 0)
+      {
+	  fprintf(stderr, "fork failed\n");
+      }
+      else{
+	  if(pid == 0){
+	      wait(NULL);
+	      fprintf(stdout, "this is main %d\n",pid);
+	  }else{
+	      char * token_argv = tokens_get_token(tokens,0);
+	      if(execv(token_argv[0],token_argv) < 0)
+		  fprintf(stdout, "exec failed\n");
+	      else
+		  fprintf(stdout, "exec successed\n");
+	  }
+      }
     }
+
 
     if (shell_is_interactive)
       /* Please only print shell prompts when standard input is not a tty */
