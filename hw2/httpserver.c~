@@ -38,8 +38,8 @@ void http_not_found(int fd);
 
 /* send file */
 void http_send_file(int fd, int req_fd, struct stat *file_stat, char *file_path){
-    //fprintf(stdout, "I am in send file\n");
-    //fprintf(stdout, "filepath: %s fd:%d  req_fd:%d\n", file_path, fd, req_fd);
+    fprintf(stdout, "I am in send file\n");
+    fprintf(stdout, "filepath: %s fd:%d  req_fd:%d\n", file_path, fd, req_fd);
     char file_size[64];
     sprintf(file_size,"%lu", file_stat->st_size);
     if (req_fd != -1) {
@@ -64,7 +64,7 @@ void send_request_data(int client_fd, int req_fd) {
 }
 /* find index , const for security*/
 int has_index(const char* path, struct stat *file_stat, char *file_path){
-    //fprintf(stdout, "I am in has index!\n");
+    fprintf(stdout, "I am in has index!\n");
     int fd;
     char* filename = (char*) malloc (MAX_PATH + 1);
     strcpy(filename, path);
@@ -100,12 +100,12 @@ void http_send_directory(int fd, char *req_dir){
 	    strcat(full_path, dir_entry->d_name);
 	    stat(full_path, &file_stat);
 	    if (S_ISDIR(file_stat.st_mode)){
-		//fprintf(stdout,"in dir\n");
+		fprintf(stdout,"in dir\n");
 		snprintf(entry_link, MAX_PATH, "<a href='%s/'>%s/</a><br>\n", dir_entry->d_name, dir_entry->d_name);
 	    }
 	    else {
 		snprintf(entry_link, MAX_PATH, "<a href='./%s'>%s/</a><br>\n", dir_entry->d_name, dir_entry->d_name);
-	       //	fprintf(stdout, "out dir\n");
+		fprintf(stdout, "out dir\n");
 	    }
 
 	    http_send_string(fd, entry_link);
